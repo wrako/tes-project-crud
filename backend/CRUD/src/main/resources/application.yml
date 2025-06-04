@@ -1,0 +1,46 @@
+server:
+  port: 8080
+
+spring:
+
+  datasource:
+    url: jdbc:mariadb://localhost:3306/offersdb
+    username: springuser
+    password: springpass
+    driver-class-name: org.mariadb.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MariaDBDialect
+
+  jackson:
+    serialization:
+      INDENT_OUTPUT: true
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: bestforum56@gmail.com
+    password: "lfdv uqfw sveq qify"
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+## ???????????? (???? ??????? Spring Security)
+#spring:
+#  security:
+#    user:
+#      name: admin
+#      password: admin123
