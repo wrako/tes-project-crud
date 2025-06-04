@@ -26,7 +26,13 @@ public class OfferController {
 
 
     @PostMapping("/get")
-    public Page<Offer> getOffersPage(@RequestBody OfferFilter filter, Pageable pageable) {
+    public Page<Offer> getOffersPage(@RequestBody OfferFilter filter, Pageable pageable, Principal principal) {
+        if (filter.getUsername() != null) {
+            filter.setUsername(principal.getName());
+            System.out.println("=============================================================");
+            System.out.println(filter.getUsername());
+        } else System.out.println("+++++++++++++++++++++++++++++++++++++++++++++++++++++\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+
         return offerService.getOffersPage(filter, pageable);
     }
 

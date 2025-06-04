@@ -12,96 +12,98 @@ import { Offer, Product } from "../../../types/offer";
 import { PageResponse } from "../../../types/pagination";
 import { OfferFilter } from "../../../types/offerFilter";
 
-interface OffersContextType {
-  // Таблица + пагинация
+
+interface OffersContextProps {
+  // Данные таблицы
   offers: Offer[];
+  totalPages: number;
   page: number;
   size: number;
-  totalPages: number;
+
+  // Чекбоксы выбора
+  selectedIds: Set<number>;
+  toggleSelectAll: () => void;
+  toggleSelectOne: (id: number) => void;
+
+  // Сортировка
   sortField: string;
   sortDirection: "asc" | "desc";
+  handleSortChange: (field: string) => void;
 
-  // Выбранные строки (checkbox)
-  selectedIds: Set<number>;
-
-  // Фильтры (временные)
+  // Фильтры (временные и активные)
   tempFilter: OfferFilter;
   tempPriceRange: [number, number];
   tempDiscountPriceRange: [number, number];
   tempQuantityRange: [number, number];
   tempDiscountPercentRange: [number, number];
 
-  // Фильтры (активные, которые отправляем на бэк)
   activeFilter: OfferFilter;
   activePriceRange: [number, number];
   activeDiscountPriceRange: [number, number];
   activeQuantityRange: [number, number];
   activeDiscountPercentRange: [number, number];
 
-  // Список всех продуктов (для фильтра «Продукты»)
   allProducts: Product[];
   loadingProducts: boolean;
   productsError: string | null;
 
-  // Модальные окна
+  onTempFilterChange: (key: keyof OfferFilter, value: any) => void;
+  onPriceSliderChange: (idx: 0 | 1, value: number) => void;
+  onDiscountPriceSliderChange: (idx: 0 | 1, value: number) => void;
+  onQuantitySliderChange: (idx: 0 | 1, value: number) => void;
+  onDiscountPercentSliderChange: (idx: 0 | 1, value: number) => void;
+
+  applyFilters: () => void;
+  resetFilters: () => void;
+
+  // Модалки и действия
   isFormModalOpen: boolean;
   isConfirmDeleteOpen: boolean;
   isErrorModalOpen: boolean;
   editingOffer: Offer | null;
   errorMessage: string;
 
-  // Методы для таблицы / пагинации / сортировки
-  goToPage: (p: number) => void;
-  changeSize: (newSize: number) => void;
-  toggleSelectAll: () => void;
-  toggleSelectOne: (id: number) => void;
-  handleSortChange: (field: string) => void;
-
-  // Методы фильтров
-  onTempFilterChange: (key: keyof OfferFilter, value: any) => void;
-  onPriceSliderChange: (idx: 0 | 1, v: number) => void;
-  onDiscountPriceSliderChange: (idx: 0 | 1, v: number) => void;
-  onQuantitySliderChange: (idx: 0 | 1, v: number) => void;
-  onDiscountPercentSliderChange: (idx: 0 | 1, v: number) => void;
-  applyFilters: () => void;
-  resetFilters: () => void;
-
-  // Методы модалок (Add/Edit/Delete/Error)
   openAddModal: () => void;
   openEditModal: (offer: Offer) => void;
+  openDeleteModal: () => void;
   closeAllModals: () => void;
   closeErrorModal: () => void;
 
   handleSave: (newOffer: Offer) => Promise<void>;
-  openDeleteModal: () => void;
   handleDelete: () => Promise<void>;
+
+  // Пагинация
+  goToPage: (p: number) => void;
+  changeSize: (newSize: number) => void;
 }
 
-const OffersContext = createContext<OffersContextType | undefined>(undefined);
+const OffersContext = createContext<OffersContextProps | undefined>(undefined);
 
 export default function OffersProvider({ children }: { children: ReactNode }) {
-  // ======= СТАНДАРТНЫЕ СТЕЙТЫ =======
+  // ====== Состояния ======
 
-  // — Таблица + пагинация —
+  // таблица
   const [offers, setOffers] = useState<Offer[]>([]);
   const [page, setPage] = useState<number>(0);
   const [size, setSize] = useState<number>(10);
   const [totalPages, setTotalPages] = useState<number>(0);
 
-  // — Выбранные строки (checkbox) —
+  // выбор записей
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
-  // — Сортировка —
+  // сортировка
   const [sortField, setSortField] = useState<string>("");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  // ======= ФИЛЬТРЫ =======
-
-  // Временные (вводимые) значения фильтрации
+  // ====== Фильтры ======
+  // Note: добавили поле username в OfferFilter
   const [tempFilter, setTempFilter] = useState<OfferFilter>({
+    username: "",             // здесь будем хранить "name" при галочке
     customerName: "",
     date: "",
     productsNames: [],
+    priceFrom: undefined,
+    priceTo: undefined,
     discountPriceFrom: undefined,
     discountPriceTo: undefined,
     quantityFrom: undefined,
@@ -110,25 +112,42 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
     discountPercentTo: undefined,
   });
 
-  // Текущие диапазоны ползунков «от/до»
-  const [tempPriceRange, setTempPriceRange] = useState<[number, number]>([0, 10000]);
-  const [tempDiscountPriceRange, setTempDiscountPriceRange] = useState<[number, number]>([0, 10000]);
-  const [tempQuantityRange, setTempQuantityRange] = useState<[number, number]>([0, 1000]);
-  const [tempDiscountPercentRange, setTempDiscountPercentRange] = useState<[number, number]>([0, 100]);
+  const [tempPriceRange, setTempPriceRange] = useState<[number, number]>([
+    0,
+    10000,
+  ]);
+  const [tempDiscountPriceRange, setTempDiscountPriceRange] = useState<
+    [number, number]
+  >([0, 10000]);
+  const [tempQuantityRange, setTempQuantityRange] = useState<[number, number]>(
+    [0, 1000]
+  );
+  const [tempDiscountPercentRange, setTempDiscountPercentRange] = useState<
+    [number, number]
+  >([0, 100]);
 
-  // Активные значения фильтров (те, что отправляем на бэк)
+  // активные фильтры, которые отправятся на бэк
   const [activeFilter, setActiveFilter] = useState<OfferFilter>({});
-  const [activePriceRange, setActivePriceRange] = useState<[number, number]>([0, 10000]);
-  const [activeDiscountPriceRange, setActiveDiscountPriceRange] = useState<[number, number]>([0, 10000]);
-  const [activeQuantityRange, setActiveQuantityRange] = useState<[number, number]>([0, 1000]);
-  const [activeDiscountPercentRange, setActiveDiscountPercentRange] = useState<[number, number]>([0, 100]);
+  const [activePriceRange, setActivePriceRange] = useState<[number, number]>([
+    0,
+    10000,
+  ]);
+  const [activeDiscountPriceRange, setActiveDiscountPriceRange] = useState<
+    [number, number]
+  >([0, 10000]);
+  const [activeQuantityRange, setActiveQuantityRange] = useState<
+    [number, number]
+  >([0, 1000]);
+  const [activeDiscountPercentRange, setActiveDiscountPercentRange] = useState<
+    [number, number]
+  >([0, 100]);
 
-  // Список всех продуктов (для мультивыбора «productsNames»)
+  // продукты (для мультиселект)
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState<boolean>(false);
   const [productsError, setProductsError] = useState<string | null>(null);
 
-  // ======= МОДАЛКИ =======
+  // ====== Модалки и ошибки ======
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
@@ -137,7 +156,7 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
 
   // ==============================
 
-  // === ЗАГРУЗКА ВСЕХ ПРОДУКТОВ (для фильтра «Продукты») ===
+  // ===== Загрузка всех продуктов при монтировании =====
   useEffect(() => {
     const fetchAllProducts = async () => {
       setLoadingProducts(true);
@@ -160,17 +179,15 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
         setLoadingProducts(false);
       }
     };
+
     fetchAllProducts();
   }, []);
 
-  // ==============================
-
-  // === ЗАГРУЗКА СПИСКА ОФЕРТ (с учётом фильтров, сортировки, пагинации) ===
+  // ===== Отправка запроса за списком Offer’ов (с учётом фильтров, сортировки и пагинации) =====
   const fetchOffers = async () => {
     try {
       const jwtToken = localStorage.getItem("jwtToken") || "";
 
-      // Готовим URL с query‐параметрами для page/size/sort
       const url = new URL("http://localhost:8080/api/offers/get");
       url.searchParams.set("page", page.toString());
       url.searchParams.set("size", size.toString());
@@ -178,17 +195,28 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
         url.searchParams.set("sort", `${sortField},${sortDirection}`);
       }
 
-      // Строим JSON‐тело POST-запроса
+      // Формируем тело из activeFilter + диапазонов
       const filterBody: OfferFilter = {};
+
+      // username (если установлена галочка «Moje ponuky»)
+      if (activeFilter.username && activeFilter.username.trim()) {
+        filterBody.username = activeFilter.username.trim();
+      }
+      // остальные текстовые фильтры
       if (activeFilter.customerName?.trim()) {
         filterBody.customerName = activeFilter.customerName.trim();
       }
       if (activeFilter.date) {
         filterBody.date = activeFilter.date;
       }
-      if (activeFilter.productsNames && activeFilter.productsNames.length > 0) {
+      if (
+        activeFilter.productsNames &&
+        activeFilter.productsNames.length > 0
+      ) {
         filterBody.productsNames = activeFilter.productsNames;
       }
+
+      // диапазоны
       filterBody.priceFrom = activePriceRange[0];
       filterBody.priceTo = activePriceRange[1];
       filterBody.discountPriceFrom = activeDiscountPriceRange[0];
@@ -210,7 +238,6 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
         const txt = await response.text();
         throw new Error(txt || `Status ${response.status}`);
       }
-
       const data: PageResponse<Offer> = await response.json();
       setOffers(data.content);
       setTotalPages(data.totalPages);
@@ -222,9 +249,10 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Перезагружаем список, когда меняются page/size/sort/фильтры
+  // При изменении page, size, sortField, sortDirection или активных фильтров — перезапрашиваем
   useEffect(() => {
     fetchOffers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     page,
     size,
@@ -237,22 +265,9 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
     activeDiscountPercentRange,
   ]);
 
-  // ==============================
+  // ===== Вспомогательные функции =====
 
-  // ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
-
-  // — Сменить страницу —
-  const goToPage = (p: number) => {
-    if (p >= 0 && p < totalPages) setPage(p);
-  };
-
-  // — Сменить size (элементов на страницу) —
-  const changeSize = (newSize: number) => {
-    setSize(newSize);
-    setPage(0);
-  };
-
-  // — Выбрать/снять выбор всего (checkbox в заголовке) —
+  // Выбрать / снять выбор всех
   const toggleSelectAll = () => {
     if (selectedIds.size === offers.length) {
       setSelectedIds(new Set());
@@ -260,8 +275,7 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
       setSelectedIds(new Set(offers.map((o) => o.id!)));
     }
   };
-
-  // — Выбрать/снять выбор одной строки —
+  // Выбрать / снять выбор одного
   const toggleSelectOne = (id: number) => {
     const newSet = new Set(selectedIds);
     if (newSet.has(id)) newSet.delete(id);
@@ -269,7 +283,7 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
     setSelectedIds(newSet);
   };
 
-  // — Смена сортировки столбца —
+  // Сортировка (при клике на заголовок)
   const handleSortChange = (field: string) => {
     if (sortField === field) {
       setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -280,7 +294,7 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
     setPage(0);
   };
 
-  // — Применить фильтры («Filtruj») —
+  // Применить фильтры (по кнопке «Filtruj»)
   const applyFilters = () => {
     setActiveFilter({ ...tempFilter });
     setActivePriceRange([...tempPriceRange]);
@@ -290,12 +304,15 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
     setPage(0);
   };
 
-  // — Сбросить фильтры («Vymazať filter») —
+  // Сбросить фильтры
   const resetFilters = () => {
     setTempFilter({
+      username: "",
       customerName: "",
       date: "",
       productsNames: [],
+      priceFrom: undefined,
+      priceTo: undefined,
       discountPriceFrom: undefined,
       discountPriceTo: undefined,
       quantityFrom: undefined,
@@ -307,7 +324,6 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
     setTempDiscountPriceRange([0, 10000]);
     setTempQuantityRange([0, 1000]);
     setTempDiscountPercentRange([0, 100]);
-
     setActiveFilter({});
     setActivePriceRange([0, 10000]);
     setActiveDiscountPriceRange([0, 10000]);
@@ -316,15 +332,15 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
     setPage(0);
   };
 
-  // — Изменение временных фильтров —
+  // Изменить временные текстовые фильтры (включая username)
   const onTempFilterChange = (key: keyof OfferFilter, value: any) => {
     setTempFilter((prev) => ({ ...prev, [key]: value }));
   };
 
-  // — Изменение диапазонов ползунков —
+  // Изменить временные диапазоны (слайдеры)
   const onPriceSliderChange = (idx: 0 | 1, value: number) => {
     setTempPriceRange((prev) => {
-      const newArr = [...prev] as [number, number];
+      const newArr: [number, number] = [...prev] as [number, number];
       if (idx === 0) newArr[0] = Math.min(value, newArr[1]);
       else newArr[1] = Math.max(value, newArr[0]);
       return newArr;
@@ -332,7 +348,7 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
   };
   const onDiscountPriceSliderChange = (idx: 0 | 1, value: number) => {
     setTempDiscountPriceRange((prev) => {
-      const newArr = [...prev] as [number, number];
+      const newArr: [number, number] = [...prev] as [number, number];
       if (idx === 0) newArr[0] = Math.min(value, newArr[1]);
       else newArr[1] = Math.max(value, newArr[0]);
       return newArr;
@@ -340,7 +356,7 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
   };
   const onQuantitySliderChange = (idx: 0 | 1, value: number) => {
     setTempQuantityRange((prev) => {
-      const newArr = [...prev] as [number, number];
+      const newArr: [number, number] = [...prev] as [number, number];
       if (idx === 0) newArr[0] = Math.min(value, newArr[1]);
       else newArr[1] = Math.max(value, newArr[0]);
       return newArr;
@@ -348,15 +364,14 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
   };
   const onDiscountPercentSliderChange = (idx: 0 | 1, value: number) => {
     setTempDiscountPercentRange((prev) => {
-      const newArr = [...prev] as [number, number];
+      const newArr: [number, number] = [...prev] as [number, number];
       if (idx === 0) newArr[0] = Math.min(value, newArr[1]);
       else newArr[1] = Math.max(value, newArr[0]);
       return newArr;
     });
   };
 
-  // ====== МОДАЛКИ: Add/Edit/Delete/Error ======
-
+  // ===== Модалки: открытие / закрытие =====
   const openAddModal = () => {
     setEditingOffer(null);
     setIsFormModalOpen(true);
@@ -365,6 +380,8 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
     setEditingOffer(offer);
     setIsFormModalOpen(true);
   };
+  const openDeleteModal = () => setIsConfirmDeleteOpen(true);
+
   const closeAllModals = () => {
     setIsFormModalOpen(false);
     setIsConfirmDeleteOpen(false);
@@ -375,7 +392,7 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
     setErrorMessage("");
   };
 
-  // — handleSave (POST/EDIT) —
+  // ===== Обработка сохранения (создание/редактирование) =====
   const handleSave = async (newOffer: Offer) => {
     try {
       const jwtToken = localStorage.getItem("jwtToken") || "";
@@ -405,18 +422,14 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
       }
 
       const resultText = await response.text();
-
-      // Если вернулось «not enough permission», то показываем ошибку
       if (resultText.toLowerCase().includes("not enough permission")) {
         setErrorMessage(resultText);
         setIsErrorModalOpen(true);
         return;
       }
-
       if (!response.ok) {
         throw new Error(resultText || `Status ${response.status}`);
       }
-
       setIsFormModalOpen(false);
       setEditingOffer(null);
       await fetchOffers();
@@ -427,8 +440,7 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // — handleDelete (DELETE) —
-  const openDeleteModal = () => setIsConfirmDeleteOpen(true);
+  // ===== Обработка удаления =====
   const handleDelete = async () => {
     try {
       const jwtToken = localStorage.getItem("jwtToken") || "";
@@ -442,17 +454,14 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
       });
 
       const resultText = await response.text();
-
       if (resultText.toLowerCase().includes("not enough permission")) {
         setErrorMessage(resultText);
         setIsErrorModalOpen(true);
         return;
       }
-
       if (!response.ok) {
         throw new Error(resultText || `Status ${response.status}`);
       }
-
       setIsConfirmDeleteOpen(false);
       setSelectedIds(new Set());
       await fetchOffers();
@@ -463,69 +472,81 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // ===== Пагинация =====
+  const goToPage = (p: number) => {
+    if (p >= 0 && p < totalPages) setPage(p);
+  };
+  const changeSize = (newSize: number) => {
+    setSize(newSize);
+    setPage(0);
+  };
+
   // ==============================
 
   return (
     <OffersContext.Provider
       value={{
-        // Таблица + пагинация
+        // таблица
         offers,
+        totalPages,
         page,
         size,
-        totalPages,
+
+        // выбор
+        selectedIds,
+        toggleSelectAll,
+        toggleSelectOne,
+
+        // сортировка
         sortField,
         sortDirection,
+        handleSortChange,
 
-        selectedIds,
-
-        // Фильтры (временные)
+        // фильтры
         tempFilter,
         tempPriceRange,
         tempDiscountPriceRange,
         tempQuantityRange,
         tempDiscountPercentRange,
 
-        // Фильтры (активные)
         activeFilter,
         activePriceRange,
         activeDiscountPriceRange,
         activeQuantityRange,
         activeDiscountPercentRange,
 
-        // Список продуктов для мультивыбора
         allProducts,
         loadingProducts,
         productsError,
-
-        // Модалки
-        isFormModalOpen,
-        isConfirmDeleteOpen,
-        isErrorModalOpen,
-        editingOffer,
-        errorMessage,
-
-        goToPage,
-        changeSize,
-        toggleSelectAll,
-        toggleSelectOne,
-        handleSortChange,
 
         onTempFilterChange,
         onPriceSliderChange,
         onDiscountPriceSliderChange,
         onQuantitySliderChange,
         onDiscountPercentSliderChange,
+
         applyFilters,
         resetFilters,
 
+        // модалки
+        isFormModalOpen,
+        isConfirmDeleteOpen,
+        isErrorModalOpen,
+        editingOffer,
+        errorMessage,
+
         openAddModal,
         openEditModal,
+        openDeleteModal,
         closeAllModals,
         closeErrorModal,
 
         handleSave,
-        openDeleteModal,
         handleDelete,
+
+        // пагинация
+        goToPage,
+        changeSize,
       }}
     >
       {children}
@@ -533,11 +554,13 @@ export default function OffersProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Хук для доступа к контексту извне
-export function useOffersContext(): OffersContextType {
-  const ctx = useContext(OffersContext);
-  if (!ctx) {
-    throw new Error("useOffersContext must be used within OffersProvider");
+// Хук-обёртка для удобного использования контекста
+export const useOffersContext = (): OffersContextProps => {
+  const context = useContext(OffersContext);
+  if (!context) {
+    throw new Error(
+      "useOffersContext must be used inside an OffersProvider"
+    );
   }
-  return ctx;
-}
+  return context;
+};
